@@ -4,7 +4,7 @@
 #include <dirwatch.h>
 #include <cthreads.h>
 #include <tracelog.h>
-#include <windows.h>
+#include <unistd.h>
 
 void onEvent(const char *path, int action, dirwatch_file_t data) {
     info("name: %s", data.name);
@@ -17,7 +17,8 @@ cmutex_t mtx;
 
 int thread1(void *args) {
     mtxLock(mtx);
-    Sleep(500);
+    sleep(1);
+    // Sleep(500);
     value1 += 5;
     value2 = value1 * 2;
     mtxUnlock(mtx);
