@@ -1,0 +1,14 @@
+{
+    "texture": "res/man.png",
+    "atlas_width": 3,
+    "atlas_height": 4,
+    "frame_time": 0.1,
+    "frame_count": 20,
+    "animations": [
+        [0], [3], [6], [9],
+        [1, 0, 2, 0],
+        [4, 3, 5, 3],
+        [7, 6, 8, 6],
+        [10, 9, 11, 9]
+    ]
+}
