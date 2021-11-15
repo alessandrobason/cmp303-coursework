@@ -5,10 +5,13 @@
 #include <utils/math_utils.h>
 #include <core/assets.h>
 
-u32 count = 0;
+GameObject::GameObject() {
+    unique_id = getUniqueId();
+}
 
 GameObject::GameObject(GameObject &&other) {
     unique_id = other.unique_id;
+    type_id = other.type_id;
     sprite = std::move(other.sprite);
     other.unique_id = 0;
 }
@@ -24,7 +27,7 @@ void GameObject::onExit() {
 }
 
 void GameObject::onUpdate() {
-    assert(unique_id != 0 && "didn't initialize id");
+    assert(type_id.id != 0 && unique_id.id != 0 && "didn't initialize ids");
     sprite.update();
 }
 

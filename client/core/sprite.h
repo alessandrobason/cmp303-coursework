@@ -9,7 +9,7 @@
 #include <utils/dynarray.h>
 
 struct Sprite;
-using AnimFinishedCB = void (*)(Sprite&);
+using AnimFinishedCB = void (*)(Sprite&, void *);
 
 struct Animation {
     f32 timer = 0.f;
@@ -39,9 +39,10 @@ struct Sprite {
     Sprite &operator=(Sprite &&spr);
 
     void load(const std::string &fname);
+    void load(const std::string &fname, recti rect);
     void load(const std::string &fname, i32 rows, i32 columns, f32 frame_duration);
 
-    void loadFromTexture(const std::string &fname);
+    void loadFromTexture(const std::string &fname, recti rect = recti::zero());
     void loadFromSheet(const std::string &fname, i32 rows, i32 columns, f32 frame_duration);
     void loadFromJSON(const std::string &fname);
     void loadNPC(u32 id);
@@ -49,7 +50,7 @@ struct Sprite {
     void play(u32 animation_id);
 
     void update();
-    void updateCallback(AnimFinishedCB callback);
+    void updateCallback(AnimFinishedCB callback, void *udata);
 };
 
 void drawSprite(const Sprite &spr);

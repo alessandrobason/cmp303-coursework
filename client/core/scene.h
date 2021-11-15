@@ -3,8 +3,12 @@
 class Scene {
 public:
     virtual ~Scene() {};
-    virtual void onInit() = 0;
-    virtual void onExit() = 0;
-    virtual void onUpdate() = 0;
-    virtual void onRender() = 0;
+    inline virtual void onInit() {};
+    inline virtual void onEnter() {};
+    inline virtual void onExit() {};
+    inline virtual void onDestroy() {};
+    inline virtual void onUpdate() {};
+    inline virtual void onRender() {};
 };
+
+extern Scene *cur_scene;

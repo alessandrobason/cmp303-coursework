@@ -22,6 +22,9 @@ void Tilemap::onExit() {
 
 void Tilemap::loadFromJSON(const std::string &fname) {
     info("Loading map from json: %s", fname.c_str());
+    
+    // already loaded
+    if(tileset.texture.id != 0) return;
 
     json::Document doc(fname);
 

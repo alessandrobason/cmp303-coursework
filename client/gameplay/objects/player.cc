@@ -2,6 +2,8 @@
 
 #include <tracelog.h>
 #include <gameplay/map_scene.h>
+#include <gameplay/objects/crate.h>
+#include <gameplay/objects/powerup.h>
 
 enum {
     STAND_DOWN, STAND_UP, STAND_LEFT, STAND_RIGHT,
@@ -13,31 +15,120 @@ enum {
     DIR_DOWN, DIR_UP, DIR_LEFT, DIR_RIGHT, DIR_NONE
 };
 
+enum {
+    LOSING_ANIMATION, WINNING_ANIMATION
+};
+
 void Player::onInit() {
-    unique_id = getUniqueId(this);
+    type_id = getUniqueTypeId(this);
     sprite.load("res/player.json");
     sprite.origin = { 0, 16 };
     sprite.position = { 5 * 16, 6 * 16 };
-    collider.init(sprite.position);
-    collider.setFixtureAsBox({ 16, 16 }, 0.3f, 0.f, 1.f, LAYER_1);
+
+    end_sprite.load("res/player_end.json");
+    end_sprite.origin = { 8, 14 };
+
+    collider.init(sprite.position, false);
+    collider.setUserData(this);
+
+    collider.setFixtureAsBox({ 16, 16 }, 0.f, 0.f, 1.f, LAYER_1);
+}
+
+void Player::onExit() {
+    collider.cleanup();
 }
 
 void Player::onUpdate() {
-    GameObject::onUpdate();
-    if(!is_locked) {
-        updateMovement();
-        if(IsKeyPressed(KEY_Z)) {
-            u16 mask = collider.getBody()->GetFixtureList()->GetFilterData().categoryBits;
-            gmap.dropBomb(sprite.position, mask);
-        }
+    assert(type_id.id != 0 && unique_id.id != 0 && "didn't initialize ids");
+    switch(cur_state) {
+    case STATE_PLAYING: playingUpdate(); break;
+    case STATE_WINNING: winningUpdate(); break;
+    case STATE_LOSING:  losingUpdate();  break;
     }
 }
 
 void Player::onRender(bool is_debug) {
-    GameObject::onRender();
+    switch(cur_state) {
+    case STATE_PLAYING: drawSprite(sprite); break;
+    case STATE_WINNING: 
+    case STATE_LOSING:  drawSprite(end_sprite); break;
+    }
     if(is_debug) {
         collider.render(RED);
     }
+}
+
+void Player::onHit() {
+    cur_state = STATE_LOSING;
+    end_sprite.position = sprite.position;
+    end_sprite.play(LOSING_ANIMATION);
+}
+
+void Player::onWin() {
+    cur_state = STATE_WINNING;
+    end_sprite.position = sprite.position;
+    end_sprite.play(WINNING_ANIMATION);
+}
+
+void Player::onPowerup(int type) {
+    switch (type) {
+    case POWERUP_FIRE:
+        bomb_strength = min(bomb_strength + 1, max_bomb_strength);
+        break;
+    case POWERUP_SKATE:
+        speed = min(speed + 3, max_speed);
+        break;
+    case POWERUP_BOMB:
+        bombs = min(bombs + 1, max_bombs);
+        break;
+    default:
+        warn("unrecognized powerup: %d", type);
+    }
+}
+
+void Player::increaseBomb() {
+    bomb_count--;
+}
+
+void Player::playingUpdate() {
+    sprite.update();
+    if(IsKeyPressed(KEY_Y)) {
+        info("player data:");
+        printf("\t\tbomb strength: %d\n", bomb_strength);
+        printf("\t\tspeed: %d\n", speed);
+        printf("\t\tmax bombs: %d\n", bombs);
+        printf("\t\tbomb count: %d\n", bomb_count);
+    }
+    if(!is_locked) {
+        updateMovement();
+        if(IsKeyPressed(KEY_Z) && bomb_count < bombs) {
+            u16 mask = collider.getBody()->GetFixtureList()->GetFilterData().categoryBits;
+            vec2i pos = sprite.position;
+            gmap.clampToCell(pos);
+            gmap.addObject<Bomb>(gmap.positionToIndex(pos), false, pos, mask, bomb_strength);
+            bomb_count++;
+        }
+    }
+}
+
+void Player::winningUpdate() {
+    end_sprite.update();
+}
+
+void Player::losingUpdate() {
+    if(IsKeyPressed(KEY_T)) {
+        cur_state = STATE_PLAYING;
+        return;
+    }
+    if(collider.getBody()->IsEnabled()) {
+        collider.getBody()->SetEnabled(false);
+    }
+    end_sprite.updateCallback(
+        [](Sprite &spr, void *udata) {
+            ((GameObject *)udata)->setDead(true);
+        }, 
+        this
+    );
 }
 
 void Player::updateMovement() {
@@ -59,9 +150,7 @@ void Player::updateMovement() {
     vel *= speed;
 
     collider.getBody()->SetLinearVelocity(vel);
-    const b2Vec2 &new_pos = collider.getBody()->GetPosition();
-    sprite.position.x = (i32)round(new_pos.x);
-    sprite.position.y = (i32)round(new_pos.y);
+    sprite.position = collider.getPosition();
 
     old_dir = dir;
 }

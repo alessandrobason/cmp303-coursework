@@ -2,13 +2,47 @@
     "texture": "res/man.png",
     "atlas_width": 3,
     "atlas_height": 4,
-    "frame_time": 0.1,
     "frame_count": 20,
     "animations": [
-        [0], [3], [6], [9],
-        [1, 0, 2, 0],
-        [4, 3, 5, 3],
-        [7, 6, 8, 6],
-        [10, 9, 11, 9]
+        {
+            "frames": [ 0 ],
+            "time": 0.1,
+            "repeat": true
+        },
+        {
+            "frames": [ 3 ],
+            "time": 0.1,
+            "repeat": true
+        },
+        {
+            "frames": [ 6 ],
+            "time": 0.1,
+            "repeat": true
+        },
+        {
+            "frames": [ 9 ],
+            "time": 0.1,
+            "repeat": true
+        },
+        {
+            "frames": [ 1, 0, 2, 0 ],
+            "time": 0.1,
+            "repeat": true
+        },
+        {
+            "frames": [ 4, 3, 5, 3 ],
+            "time": 0.1,
+            "repeat": true
+        },
+        {
+            "frames": [ 7, 6, 8, 6 ],
+            "time": 0.1,
+            "repeat": true
+        },
+        {
+            "frames": [ 10, 9, 11, 9 ],
+            "time": 0.1,
+            "repeat": true
+        }
     ]
 }

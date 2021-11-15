@@ -3,13 +3,18 @@
 #include <tracelog.h>
 #include <gameplay/map_scene.h>
 
-Bomb::Bomb(vec2i position, u16 source_layer) {
+Bomb::Bomb(vec2i position, u16 source_layer, int bomb_strength) {
     sprite.position = position;
     mask = source_layer;
+    strength = bomb_strength;
+}
+
+Bomb::~Bomb() {
+    collider.cleanup();
 }
 
 void Bomb::onInit() {
-    unique_id = getUniqueId(this);
+    type_id = getUniqueTypeId(this);
     sprite.load("res/bomb.png", 1, 4, 0.2f);
     collider.init();
 
@@ -27,13 +32,24 @@ void Bomb::onInit() {
 
 void Bomb::onUpdate() {
     GameObject::onUpdate();
-    if(mask) {
+    if(!is_solid) {
         if(!is_inside) {
             makeSolid();
         }
         is_inside = false;
     }
 
+    timer -= GetFrameTime();
+    if(timer <= 0.f) {
+        dead = true;
+        increasePlayerBombs();
+        gmap.setId(gmap.positionToIndex(sprite.position), 0);
+        gmap.addExplosion(sprite.position, vec2i::zero(), 0);
+        gmap.addExplosion(sprite.position, { -1,  0 }, strength);
+        gmap.addExplosion(sprite.position, {  1,  0 }, strength);
+        gmap.addExplosion(sprite.position, {  0, -1 }, strength);
+        gmap.addExplosion(sprite.position, {  0,  1 }, strength);
+    }
 }
 
 void Bomb::onRender(bool is_debug) {
@@ -57,5 +73,20 @@ void Bomb::makeSolid() {
         fix->SetFilterData(filter);
         fix = fix->GetNext();
     }
-    mask = 0;
+    is_solid = true;
+}
+
+void Bomb::increasePlayerBombs() {
+    auto &objects = gmap.getObjects();
+    TypeId player_id = getUniqueTypeId<Player>();
+    for(auto &obj : objects) {
+        if(obj->getTypeId() == player_id) {
+            Player *p = (Player *)obj.get();
+            u16 pmask = p->getCollider().getBody()->GetFixtureList()->GetFilterData().categoryBits;
+            if(pmask == mask) {
+                warn("FOUND PLAYER");
+                p->increaseBomb();
+            }
+        }
+    }
 }

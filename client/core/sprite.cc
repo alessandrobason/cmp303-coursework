@@ -57,14 +57,32 @@ void Sprite::load(const std::string &fname) {
     }
 }
 
+void Sprite::load(const std::string &fname, recti rect) {
+    loadFromTexture(fname, rect);
+}
+
 void Sprite::load(const std::string &fname, i32 rows, i32 columns, f32 frame_duration) {
     loadFromSheet(fname, rows, columns, frame_duration);
 }
 
 
-void Sprite::loadFromTexture(const std::string &fname) {
+void Sprite::loadFromTexture(const std::string &fname, recti rect) {
     texture = assets::getTexture(fname);
-    size = {texture.width, texture.height};
+
+    if(rect.w && rect.h) {
+        animations.init(1);
+        anim_positions.init(1);
+
+        animations[0].img_ids.init(1);
+        animations[0].duration = INFINITY; // infinite animation
+        animations[0].img_ids[0] = 0;
+        anim_positions[0] = rect.position();
+
+        size = rect.size();
+    }
+    else {
+        size = {texture.width, texture.height};
+    }
 }
 
 void Sprite::loadFromSheet(const std::string &fname, i32 rows, i32 columns, f32 frame_duration) {
@@ -104,21 +122,24 @@ void Sprite::loadFromJSON(const std::string &fname) {
     size.y = sprite_height;
 
     json::Array json_animations = doc["animations"];
-    f64 frame_time = doc["frame_time"];
 
     animations.init(json_animations.size());
     i64 actual_frame_count = 0;
     u32 current_frame = 0;
 
     for(size_t i = 0; i < json_animations.size(); ++i) {
-        json::Array anim = json_animations[i];
+        json::Object anim  = json_animations[i];
+        json::Array frames = anim["frames"];
+        f64 time           = anim["time"];
+        bool repeat        = anim["repeat"];
 
-        actual_frame_count += anim.size();
-        animations[i].img_ids.init(anim.size());
-        animations[i].duration = frame_time;
-    
-        for(size_t j = 0; j < anim.size(); ++j) {
-            i64 id = anim[j];
+        actual_frame_count += frames.size();
+        animations[i].img_ids.init(frames.size());
+        animations[i].duration = time;
+        animations[i].repeat = repeat;
+        
+        for(size_t j = 0; j < frames.size(); ++j) {
+            i64 id = frames[j];
             u32 x = (id % atlas_width) * sprite_width;
             u32 y = (id / atlas_width) * sprite_height;
             anim_positions[current_frame] = {
@@ -201,13 +222,13 @@ void Sprite::update() {
             anim.cur_image++;
             // wrap animation
             if(anim.finished()) {
-                anim.cur_image = anim.repeat ? 0 : anim.img_ids.size() - 1;
+                anim.cur_image = anim.repeat ? 0 : (anim.img_ids.size() - 1);
             }
         }
     }
 }
 
-void Sprite::updateCallback(AnimFinishedCB callback) {
+void Sprite::updateCallback(AnimFinishedCB callback, void *udata) {
     if (animations.data() && anim_positions.data()) {
         Animation &anim = animations[cur_animation];
         anim.timer += GetFrameTime();
@@ -216,7 +237,7 @@ void Sprite::updateCallback(AnimFinishedCB callback) {
             anim.cur_image++;
             // wrap animation
             if(anim.finished()) {
-                callback(*this);
+                callback(*this, udata);
                 anim.cur_image = anim.repeat ? 0 : anim.img_ids.size() - 1;
             }
         }

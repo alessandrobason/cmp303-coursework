@@ -1,0 +1,18 @@
+{
+    "texture": "res/player_end.png",
+    "atlas_width": 3,
+    "atlas_height": 3,
+    "frame_count": 9,
+    "animations": [
+        {
+            "frames": [ 0, 1, 2, 3, 4, 5 ],
+            "time": 0.1,
+            "repeat": false
+        },
+        {
+            "frames": [ 6, 7, 8 ],
+            "time": 0.5,
+            "repeat": false
+        }
+    ]
+}

@@ -4,18 +4,11 @@
 
 #include <utils/vec.h>
 #include <core/sprite.h>
-
-extern u32 count;
-
-template<typename T>
-u32 getUniqueId(T *ptr = nullptr) {
-    static u32 id = ++count;
-    return id;
-}
+#include <core/id.h>
 
 class GameObject {
 public:
-    GameObject() = default;
+    GameObject();
     GameObject(GameObject &&other);
 
     virtual ~GameObject();
@@ -24,12 +17,17 @@ public:
     virtual void onUpdate();
     virtual void onRender(bool is_debug = false);
 
-    inline u32 getId() const { return unique_id; }
+    inline UniqueId getId() const { return unique_id; }
+    inline TypeId getTypeId() const { return type_id; }
     inline vec2i getPosition() const { return sprite.position; }
+    inline bool isDead() const { return dead; }
+    inline void setDead(bool is_dead) { dead = is_dead; }
 
     bool operator<(const GameObject &other);
 
 protected:
-    u32 unique_id = 0;
+    TypeId type_id;
+    UniqueId unique_id;
     Sprite sprite;
+    bool dead = false;
 };

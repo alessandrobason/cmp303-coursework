@@ -10,13 +10,13 @@ extern b2World g_world;
 
 enum physics_layers : u16 {
 	NO_LAYER = 1 << 0, 
-	LAYER_1  = 1 << 1, 
-	LAYER_2  = 1 << 2, 
-	LAYER_3  = 1 << 3, 
-	LAYER_4  = 1 << 4, 
-	LAYER_5  = 1 << 5,
+	LAYER_1  = 1 << 1, // PLAYER 1 
+	LAYER_2  = 1 << 2, // PLAYER 2 
+	LAYER_3  = 1 << 3, // PLAYER 3 
+	LAYER_4  = 1 << 4, // PLAYER 4 
+	LAYER_5  = 1 << 5, // BOMBS
 	LAYER_6  = 1 << 6,
-	LAYER_7  = 1 << 7,
+	LAYER_7  = 1 << 7, // CRATES
 	LAYER_8  = 1 << 8,
 	LAYER_9  = 1 << 9,
     ALL_LAYERS = 0xffff
@@ -38,7 +38,7 @@ public:
     }
     ~StaticBody() = default;
 
-    void init(const vec2i &position = vec2i::zero());
+    void init(const vec2i &position = vec2i::zero(), bool allow_sleep = true);
     void init(b2BodyDef &definition);
 
     void cleanup();
@@ -56,6 +56,8 @@ public:
     void setFixtureAsCircle(const vec2i &pos, i32 radius, float friction, float restitution, float density, physics_layers layer = NO_LAYER, physics_layers mask = ALL_LAYERS, bool is_sensor = false);
     void setFixtureAsCircle(const vec2i &pos, i32 radius, physics_layers = NO_LAYER, physics_layers mask = ALL_LAYERS);
 
+    vec2i getPosition();
+
     void render(Color color);
 
     inline void setCollisionResponse(CollisionResponseFunc function);
@@ -68,8 +70,6 @@ public:
     inline b2Body *getBody();
     inline void setBody(b2Body *new_body);
 
-    inline vec2i getPosition();
-
 protected:
     b2Body *body = nullptr;
     CollisionResponseFunc collision_response = nullptr;
@@ -80,7 +80,7 @@ class KinematicBody : public StaticBody {
 public:
     KinematicBody() = default;
 
-    void init(const vec2i &position = vec2i::zero(), float angle = 0.f, bool is_bullet = false);
+    void init(const vec2i &position = vec2i::zero(), bool allow_sleep = true, float angle = 0.f, bool is_bullet = false);
     void init(b2BodyDef &definition);
 };
 
@@ -88,7 +88,7 @@ class DynamicBody : public StaticBody {
 public:
     DynamicBody() = default;
 
-    void init(const vec2i &position = vec2i::zero(), float angle = 0.f, bool is_bullet = false);
+    void init(const vec2i &position = vec2i::zero(), bool allow_sleep = true, float angle = 0.f, bool is_bullet = false);
     void init(b2BodyDef &definition);
 };
 
@@ -120,9 +120,4 @@ b2Body *StaticBody::getBody() {
 void StaticBody::setBody(b2Body *new_body) {
     assert(body != new_body);
     body = new_body;
-}
-
-vec2i StaticBody::getPosition() {
-    b2Vec2 p = body->GetPosition();
-    return { (i32)p.x, (i32)p.y };
 }

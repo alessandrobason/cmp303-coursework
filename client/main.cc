@@ -1,14 +1,19 @@
+#include <vector>
+
 #include <raylib.h>
 #include <tracelog.h>
 
-#include <utils/vec.h>
-#include <utils/rect.h>
 #include <core/config.h>
 #include <core/tilemap.h>
+#include <core/assets.h>
+#include <core/gui.h>
 
+#include <utils/vec.h>
+#include <utils/rect.h>
 #include <utils/ptr.h>
 
 #include <gameplay/map_scene.h>
+#include <gameplay/menu_scene.h>
 
 int main() {
     Config::load();
@@ -23,13 +28,29 @@ int main() {
     SetWindowState(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     SetWindowMinSize(resolution.x, resolution.y);
 
+    Font font = assets::getFont("res/HeartbitXX.png");
+    GuiSetFont(font);
+    GuiLoadStyle("res/candy.rgs");
+
     RenderTexture2D target = LoadRenderTexture(resolution.x, resolution.y);
+
+    Texture2D bomb_texture = assets::getTexture("res/bomb.png");
     
-    Scene *cur_scene = &gmap;
+    MenuScene menu;
+
+    std::vector<Scene *> scenes;
+    scenes.emplace_back(&menu);
+    scenes.emplace_back(&gmap);
+    cur_scene = &gmap;
+    // cur_scene = &menu;
+
+    for(auto scene : scenes) {
+        scene->onInit();
+    }
 
     SetTargetFPS(60);
 
-    cur_scene->onInit();
+    cur_scene->onEnter();
 
     while(!WindowShouldClose()) {
         // == UPDATE =========================
@@ -59,17 +80,20 @@ int main() {
         vec2f scaled_res = resolution;
         scaled_res *= scale;
 
+        Rectangle target_source {
+            0, 0,
+            (f32)target.texture.width,
+            (f32)-target.texture.height
+        };
+        recti target_dest {
+            (src_sz - scaled_res) / 2, scaled_res
+        };
+
+        SetMouseScale(1.f / scale, 1.f / scale);
+        SetMouseOffset(-target_dest.x, -target_dest.y);
+
         BeginDrawing();
             ClearBackground(BLACK);
-
-            Rectangle target_source {
-                0, 0,
-                (f32)target.texture.width,
-                (f32)-target.texture.height
-            };
-            recti target_dest {
-                (src_sz - scaled_res) / 2, scaled_res
-            };
             DrawTexturePro(
                 target.texture,
                 target_source, target_dest,
@@ -79,8 +103,14 @@ int main() {
             DrawFPS(10, 10);
         EndDrawing();
     }
-
     cur_scene->onExit();
+
+    for(auto scene : scenes) {
+        scene->onDestroy();
+    }
+
+    assets::destroyFont(font);
+    assets::destroyTexture(bomb_texture);
 
     CloseWindow();
 }

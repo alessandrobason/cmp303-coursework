@@ -81,6 +81,22 @@ public:
         return m_data[index];
     }
 
+    T &front() {
+        return m_data[0];
+    }
+
+    const T &front() const {
+        return m_data[0];
+    }
+
+    T &back() {
+        return m_data[m_size - 1];
+    }
+
+    const T &back() const {
+        return m_data[m_size - 1];
+    }
+
     T *begin() {
         return m_data;
     }

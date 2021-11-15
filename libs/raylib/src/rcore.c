@@ -854,6 +854,14 @@ void InitWindow(int width, int height, const char *title)
 #endif        // PLATFORM_DESKTOP || PLATFORM_WEB || PLATFORM_RPI || PLATFORM_DRM
 }
 
+void AskCloseWindow(void) 
+{
+    CORE.Window.shouldClose = true;
+#if defined(PLATFORM_DESKTOP)
+    glfwSetWindowShouldClose(CORE.Window.handle, GLFW_TRUE);
+#endif
+}
+
 // Close window and unload OpenGL context
 void CloseWindow(void)
 {
@@ -861,6 +869,15 @@ void CloseWindow(void)
     if (gifRecording)
     {
         MsfGifResult result = msf_gif_end(&gifState);
+        if (result.data) {
+            char path[512] = { 0 };
+            strcpy(path, TextFormat("%s/%s", CORE.Storage.basePath, TextFormat("screenrec%03i.gif", screenshotCounter)));
+
+            FILE * fp = fopen(path, "wb");
+            fwrite(result.data, result.dataSize, 1, fp);
+            fclose(fp);
+            TRACELOG(LOG_INFO, "SYSTEM: Saved gif: [%s]", path);
+        }
         msf_gif_free(result);
         gifRecording = false;
     }

@@ -2,9 +2,9 @@
 
 #include <algorithm>
 #include <tracelog.h>
+#include <time.h>
 
-#include <core/config.h>
-#include <gameplay/objects/player.h>
+#include <gameplay/objects/explosion.h>
 
 MapScene gmap;
 
@@ -16,8 +16,25 @@ MapScene::~MapScene() {
 }
 
 void MapScene::onInit() {
-    map.loadFromJSON("res/tiled/map_1.json");
+    srand(time(NULL));
+    int r = rand() % 3;
+    // r = 0;
+    map.loadFromJSON(TextFormat("res/tiled/map_%d.json", r));
+    // map.loadFromJSON("res/tiled/map_1.json");
+    int under = (map.layers_under - 1) * map.size.x * map.size.y;
+    obj_map.resize(map.size.x * map.size.y);
+    for(int y = 0; y < map.size.y; ++y) {
+        for(int x = 0; x < map.size.x; ++x) {
+            int i = x + y * map.size.x;
+            if(map.tiles[under + i] >= 0) {
+                obj_map[i].id = -1;
+            }
+        }
+    }
+    placeCrates();
+}
 
+void MapScene::onEnter() {
     objects.emplace_back(std::make_unique<Player>());
 
     for(auto &obj : objects) {
@@ -30,6 +47,9 @@ void MapScene::onExit() {
         obj->onExit();
     }
     objects.clear();
+}
+
+void MapScene::onDestroy() {
     map.onExit();
 }
 
@@ -45,13 +65,15 @@ void MapScene::onUpdate() {
     for(auto &obj : objects) {
         obj->onUpdate();
     }
-    
-    for(auto &drop : to_drop) {
-        objects.emplace_back(std::make_unique<Bomb>(drop.first, drop.second));
-        objects.back()->onInit();
+
+    actuallyRemove();
+
+    for(auto &add : to_add) {
+        add->onInit();
+        objects.emplace_back(add);
     }
 
-    to_drop.clear();
+    to_add.clear();
 
     std::sort(objects.begin(), objects.end(), sortFn);
 }
@@ -67,35 +89,29 @@ void MapScene::onRender() {
     drawTilemapOver(map);
 }
 
-void MapScene::dropBomb(vec2i position, u16 source_layer) {
-    // clamp position to cell
-    int res = position.x % 16;
-    if(res != 0) {
-        if(res > 8) res -= 16;
-        position.x -= res;
-    }
-    res = position.y % 16;
-    if(res != 0) {
-        if(res > 8) res -= 16;
-        position.y -= res;
-    }
+void MapScene::addExplosion(vec2i position, vec2i direction, int strength) {
+    clampToCell(position);
+    vec2i next_pos = position + (direction * Config::get().tile_size);
+    position = next_pos / Config::get().tile_size;
+    u32 index = position.x + position.y * map.size.x;
+    TypeId type = obj_map[index];
 
-    // check if there is already a bomb in the same place
-
-    for(auto &drop : to_drop) {
-        if(drop.first == position) return;
+    if(type.id == 0) {
+        addObject<Explosion>(index, true, next_pos, direction, strength);
     }
-
-    u32 bomb_id = getUniqueId<Bomb>();
-    for(auto &obj : objects) {
-        if(obj->getId() == bomb_id) {
-            if(position == obj->getPosition()) {
-                return;
+    else if(type == getUniqueTypeId<Crate>()) {
+        for(auto &obj : objects) {
+            if(obj->getPosition() == next_pos) {
+                ((Crate *)obj.get())->onHit();
+                break;
             }
         }
+        addObject<Explosion>(index, true, next_pos, direction, 0);
     }
+}
 
-    to_drop.emplace_back(position, source_layer);
+void MapScene::removeCollider(StaticBody *ptr) {
+    body_to_remove.emplace_back(ptr);
 }
 
 void MapScene::handleCollisions() {
@@ -112,5 +128,63 @@ void MapScene::handleCollisions() {
         }
 
 		contact = contact->GetNext();
+    }
+}
+
+void MapScene::actuallyRemove() {
+    size_t size = objects.size();
+    for(size_t i = 0; i < size; ++i) {
+        auto &obj = objects[i];
+        if(obj->isDead()) {
+            setId(positionToIndex(obj->getPosition()), 0);
+
+            obj->onExit();
+            i--;
+            size--;
+            obj.swap(objects[size]);
+        }
+    }
+    
+    objects.resize(size);
+
+    for(auto &body : body_to_remove) {
+        body->cleanup();
+    }
+
+    body_to_remove.clear();
+}
+
+void MapScene::placeCrates() {
+    constexpr int ystart = 6;
+    constexpr int yend   = 15;
+    constexpr int xstart = 5;
+    constexpr int xend   = 20;
+
+    constexpr vec2i skip[] = {
+        {  5,  6 }, {  6,  6 }, {  5,  7 },
+        { 18,  6 }, { 19,  6 }, { 19,  7 },
+        {  5, 13 }, {  6, 14 }, {  5, 14 },
+        { 18, 14 }, { 19, 14 }, { 19, 13 },
+    };
+
+    for(int y = ystart; y < yend; ++y) {
+        for(int x = xstart; x < xend; ++x) {
+            vec2i v { x, y };
+            bool should_skip = false;
+            for(auto &s : skip) {
+                if(s == v) {
+                    should_skip = true;
+                    break;
+                }
+            }
+            if(should_skip) continue;
+            u32 index = x + y * map.size.x;
+            if(obj_map[index].id == 0) {
+                int r = rand() % 10;
+                if(r < 8) {
+                    addObject<Crate>(index, true, v * Config::get().tile_size);
+                }
+            }
+        }
     }
 }
