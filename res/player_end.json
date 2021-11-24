@@ -12,7 +12,7 @@
         {
             "frames": [ 6, 7, 8 ],
             "time": 0.5,
-            "repeat": false
+            "repeat": true
         }
     ]
 }

@@ -1,9 +1,15 @@
 #include "player.h"
 
 #include <tracelog.h>
+#include <core/assets.h>
 #include <gameplay/map_scene.h>
 #include <gameplay/objects/crate.h>
 #include <gameplay/objects/powerup.h>
+#include <utils/interpolation.h>
+#include <net/net.h>
+
+Player players[max_players];
+int player_count = 0;
 
 enum {
     STAND_DOWN, STAND_UP, STAND_LEFT, STAND_RIGHT,
@@ -19,27 +25,70 @@ enum {
     LOSING_ANIMATION, WINNING_ANIMATION
 };
 
+void Player::setName(char newname[8]) {
+    memcpy(name, newname, sizeof(name));
+    name[sizeof(name)-1] = '\0';
+}
+
+void Player::addPlayer(u8 id, bool new_is_main) {
+    constexpr vec2i positions[max_players] = {
+        {  5 * 16,  6 * 16 },
+        { 19 * 16,  6 * 16 },
+        {  5 * 16, 14 * 16 },
+        { 19 * 16, 14 * 16 }
+    };
+    constexpr Color colors[max_players] = {
+        WHITE,
+        { 102, 225, 0, 255 },
+        { 225,  89, 0, 255 },
+        { 208, 0, 225, 255 },
+    };
+
+    player_id = id;
+    sprite.position = positions[player_id];
+    sprite.color = colors[player_id];
+    end_sprite.color = colors[player_id];
+    is_main = new_is_main;
+    player_count++;
+
+    gmap.getObjects().emplace_back(this);
+    info("player %d initialized", player_id);
+}
+
 void Player::onInit() {
-    type_id = getUniqueTypeId(this);
     sprite.load("res/player.json");
     sprite.origin = { 0, 16 };
-    sprite.position = { 5 * 16, 6 * 16 };
 
     end_sprite.load("res/player_end.json");
     end_sprite.origin = { 8, 14 };
 
-    collider.init(sprite.position, false);
-    collider.setUserData(this);
-
-    collider.setFixtureAsBox({ 16, 16 }, 0.f, 0.f, 1.f, LAYER_1);
+    player_mtx = mtxInit();
+    assert(mtxValid(player_mtx));
+    
+    next_pos = sprite.position;
+    cur_state = STATE_PLAYING;
 }
 
 void Player::onExit() {
-    collider.cleanup();
+    sprite.destroy();
+    end_sprite.destroy();
+
+    mtxDestroy(player_mtx);
+    player_mtx = NULL;
 }
 
 void Player::onUpdate() {
-    assert(type_id.id != 0 && unique_id.id != 0 && "didn't initialize ids");
+    assert(getTypeId() != 0 && unique_id.id != 0 && "didn't initialize ids");
+    {
+        lock_t lock(player_mtx);
+        if (next_state != -1) {
+            switch (next_state) {
+            case STATE_WINNING: onWin(); break;
+            case STATE_LOSING:  onHit(); break;
+            }
+            next_state = -1;
+        }
+    }
     switch(cur_state) {
     case STATE_PLAYING: playingUpdate(); break;
     case STATE_WINNING: winningUpdate(); break;
@@ -49,12 +98,9 @@ void Player::onUpdate() {
 
 void Player::onRender(bool is_debug) {
     switch(cur_state) {
-    case STATE_PLAYING: drawSprite(sprite); break;
+    case STATE_PLAYING: drawSprite(sprite);     break;
     case STATE_WINNING: 
     case STATE_LOSING:  drawSprite(end_sprite); break;
-    }
-    if(is_debug) {
-        collider.render(RED);
     }
 }
 
@@ -68,45 +114,60 @@ void Player::onWin() {
     cur_state = STATE_WINNING;
     end_sprite.position = sprite.position;
     end_sprite.play(WINNING_ANIMATION);
+    gmap.setFinished(is_main);
 }
 
-void Player::onPowerup(int type) {
-    switch (type) {
-    case POWERUP_FIRE:
-        bomb_strength = min(bomb_strength + 1, max_bomb_strength);
-        break;
-    case POWERUP_SKATE:
-        speed = min(speed + 3, max_speed);
-        break;
-    case POWERUP_BOMB:
-        bombs = min(bombs + 1, max_bombs);
-        break;
-    default:
-        warn("unrecognized powerup: %d", type);
-    }
+void Player::setPosition(vec2i newpos) {
+    if (!mtxValid(player_mtx)) return;
+    lock_t lock(player_mtx);
+    next_pos = newpos;
 }
 
-void Player::increaseBomb() {
-    bomb_count--;
+void Player::setAnimation(u8 new_anim) {
+    lock_t lock(player_mtx);
+    next_anim = new_anim;
+}
+
+void Player::setState(u8 new_state) {
+    lock_t lock(player_mtx);
+    next_state = new_state;
 }
 
 void Player::playingUpdate() {
     sprite.update();
-    if(IsKeyPressed(KEY_Y)) {
-        info("player data:");
-        printf("\t\tbomb strength: %d\n", bomb_strength);
-        printf("\t\tspeed: %d\n", speed);
-        printf("\t\tmax bombs: %d\n", bombs);
-        printf("\t\tbomb count: %d\n", bomb_count);
-    }
-    if(!is_locked) {
+    if(!is_locked && is_main) {
         updateMovement();
-        if(IsKeyPressed(KEY_Z) && bomb_count < bombs) {
-            u16 mask = collider.getBody()->GetFixtureList()->GetFilterData().categoryBits;
-            vec2i pos = sprite.position;
-            gmap.clampToCell(pos);
-            gmap.addObject<Bomb>(gmap.positionToIndex(pos), false, pos, mask, bomb_strength);
-            bomb_count++;
+        if(IsKeyPressed(KEY_Z)) {
+            lock_t lock(player_mtx);
+            Message<vec2i> msg {
+                MSG_BOMB_REQ, sprite.position
+            };
+            net.sendMessage(msg);
+        }
+    }
+    {
+        lock_t lock(player_mtx);
+        if (lerp_time >= 0.f) {
+            sprite.position = lerp<linear>((vec2f)lerp_pos, (vec2f)next_pos, lerp_time);
+            if (lerp_time >= 1.f) {
+                lerp_time = -1.f;
+            }
+            else {
+                lerp_time += GetFrameTime() * 10.f;
+            }
+        }
+        else {
+            i32 diff = (next_pos - sprite.position).mag();
+            if (diff > 10) {
+                lerp_pos = sprite.position;
+                lerp_time = 0.f;
+            }
+            else {
+                sprite.position = next_pos;
+            }
+        }
+        if (next_anim != sprite.cur_animation) {
+            playAnimation(next_anim);
         }
     }
 }
@@ -116,41 +177,20 @@ void Player::winningUpdate() {
 }
 
 void Player::losingUpdate() {
-    if(IsKeyPressed(KEY_T)) {
-        cur_state = STATE_PLAYING;
-        return;
-    }
-    if(collider.getBody()->IsEnabled()) {
-        collider.getBody()->SetEnabled(false);
-    }
-    end_sprite.updateCallback(
-        [](Sprite &spr, void *udata) {
-            ((GameObject *)udata)->setDead(true);
-        }, 
-        this
-    );
+    end_sprite.update();
 }
 
 void Player::updateMovement() {
     vec2i dir {
-        IsKeyDown(KEY_D) - IsKeyDown(KEY_A),
-        IsKeyDown(KEY_S) - IsKeyDown(KEY_W)
+        IsKeyDown(KEY_RIGHT) - IsKeyDown(KEY_LEFT),
+        IsKeyDown(KEY_DOWN) - IsKeyDown(KEY_UP)
     };
 
     if(dir != old_dir) {
-        if(dir == vec2i::zero()) {
-            setIdleAnim(old_dir);
-        }
-        else {
-            setWalkingAnim(dir);
-        }
+        // send direction
+        Message<vec2b> dir_msg { MSG_DIR, dir };
+        net.sendMessage(dir_msg);
     }
-
-    b2Vec2 vel = {(f32)dir.x, (f32)dir.y};
-    vel *= speed;
-
-    collider.getBody()->SetLinearVelocity(vel);
-    sprite.position = collider.getPosition();
 
     old_dir = dir;
 }

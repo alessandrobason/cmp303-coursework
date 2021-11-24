@@ -2,14 +2,24 @@
 
 #include <gameplay/game_object.h>
 #include <gameplay/collider.h>
+#include <cthreads.h>
+
+constexpr int max_players = 4;
 
 class Player : public GameObject {
     enum {
-        STATE_PLAYING, STATE_WINNING, STATE_LOSING
+        STATE_NONE, STATE_PLAYING, STATE_WINNING, STATE_LOSING
     };
 
 public:
     using GameObject::GameObject;
+
+    inline static u32 id() { return 4; }
+
+    void setName(char newname[8]);
+    inline const char *getName() const { return name; };
+
+    void addPlayer(u8 id, bool is_main);
 
     void onInit() override;
     void onExit() override;
@@ -18,10 +28,13 @@ public:
 
     void onHit();
     void onWin();
-    void onPowerup(int type);
-    void increaseBomb();
+
+    void setPosition(vec2i newpos);
+    void setAnimation(u8 new_anim);
+    void setState(u8 new_state);
 
     inline DynamicBody &getCollider() { return collider; }
+    inline u32 getTypeId() const override { return Player::id(); };
 
 private:
     void playingUpdate();
@@ -35,6 +48,8 @@ private:
     void setWalkingAnim(vec2i dir);
     int dirToInt(vec2i dir);
 
+    char name[8] = {0};
+
     int bomb_strength = 0;
     int bombs = 1;
     int bomb_count = 0;
@@ -47,9 +62,24 @@ private:
     DynamicBody collider;
 
     bool is_locked = false;
+    bool is_main = false;
     vec2i old_dir;
+    vec2i next_pos;
+    vec2i lerp_pos;
+    vec2i next_dir;
+    u8 next_anim = 0;
+    int next_state = -1;
+
+    f32 lerp_time = -1.f;
 
     Sprite end_sprite;
 
-    int cur_state = STATE_PLAYING;
+    int cur_state = STATE_NONE;
+
+    int player_id = -1;
+    cmutex_t player_mtx = NULL;
+    std::vector<vec2i> bombs_to_drop;
 };
+
+extern Player players[max_players];
+extern int player_count;

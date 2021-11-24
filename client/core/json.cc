@@ -17,10 +17,18 @@ namespace json {
     // == DOCUMENT ===========================================================================
 
     Document::Document(const std::string &fname) {
-        str_t f_data = fileReadWholeText(fname.c_str());
-        if(f_data.buf == NULL) {
-            fatal("couldn't read file %s", fname.c_str());
-            return;
+        constexpr int max_tries = 10;
+        str_t f_data = strInit();
+        
+        for(int i = 0; i < max_tries; ++i) {
+            f_data = fileReadWholeText(fname.c_str());
+            if(f_data.buf) {
+                break;
+            }
+            err("couldn't read file %s, trying another %d times", fname.c_str(), max_tries - i);
+        }
+        if(!f_data.buf) {
+            fatal("couldn't read file after %d tries", max_tries);
         }
 
         m_data = cJSON_ParseWithLength(f_data.buf, f_data.len);

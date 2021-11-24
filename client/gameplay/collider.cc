@@ -1,3 +1,5 @@
+#if 0
+
 #include "collider.h"
 
 #include <assert.h>
@@ -6,7 +8,17 @@ b2World g_world(b2Vec2(0.f, 0.f));
 constexpr f32 SCALE = 0.1f;
 
 // STATIC_BODY --------------------------------------
-	
+
+StaticBody::StaticBody(const StaticBody &other)  {
+    collision_response = other.collision_response;
+    collision_udata = other.collision_udata;
+    body = other.body;
+    // when a vector resizes it may change the "this"
+    // pointer, reset it just for good measure
+    if(body)
+        body->GetUserData().pointer = (uintptr_t)this;
+}
+
 void StaticBody::init(const vec2i &position, bool allow_sleep) {
     assert(body == nullptr && "init called after other functions");
 
@@ -229,6 +241,10 @@ void StaticBody::render(Color color) {
     }
 }
 
+u16 StaticBody::getMask() {
+    return body->GetFixtureList()->GetFilterData().categoryBits;
+}
+
 // KINEMATIC_BODY --------------------------------------
 
 void KinematicBody::init(const vec2i &position, bool allow_sleep, float angle, bool is_bullet) {
@@ -275,3 +291,5 @@ void DynamicBody::init(b2BodyDef &definition) {
 
     body = g_world.CreateBody(&definition);
 }
+
+#endif

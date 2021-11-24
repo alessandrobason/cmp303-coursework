@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 #include <tracelog.h>
+#include <os.h>
 
 #include <core/config.h>
 #include <core/tilemap.h>
@@ -15,8 +16,14 @@
 #include <gameplay/map_scene.h>
 #include <gameplay/menu_scene.h>
 
+#include <net/net.h>
+
 int main() {
     Config::load();
+
+    if (!skInit()) {
+        fatal("couldn't initialize sockets => %s", skGetErrorString());
+    }
 
     vec2i resolution = Config::get().resolution;
 
@@ -24,7 +31,7 @@ int main() {
 
     SetTraceLogCallback(traceLogVaList);
 
-    InitWindow(800, 800, "online game");
+    InitWindow(resolution.x, resolution.y, "Client");
     SetWindowState(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     SetWindowMinSize(resolution.x, resolution.y);
 
@@ -41,16 +48,15 @@ int main() {
     std::vector<Scene *> scenes;
     scenes.emplace_back(&menu);
     scenes.emplace_back(&gmap);
-    cur_scene = &gmap;
-    // cur_scene = &menu;
 
     for(auto scene : scenes) {
         scene->onInit();
     }
 
-    SetTargetFPS(60);
+    //swapScene(&gjoin);
+    swapScene(&menu);
 
-    cur_scene->onEnter();
+    SetTargetFPS(60);
 
     while(!WindowShouldClose()) {
         // == UPDATE =========================

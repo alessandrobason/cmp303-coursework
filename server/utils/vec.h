@@ -1,7 +1,7 @@
-#ifndef VEC_HPP
-#define VEC_HPP
+#pragma once
 
 #include <cmath>
+#include <raylib.h> // Vector2, Vector3, Vector4
 
 #include "types.h"
 #include "math_utils.h"
@@ -10,32 +10,40 @@ template<typename T>
 struct vec2 {
     T x, y;
 
-    vec2() {
-        x = y = 0;
+    constexpr vec2() 
+        : x(0), y(0) 
+    {
     }
 
-    vec2(const T &value_for_all) {
-        x = value_for_all;
-        y = value_for_all;
+    constexpr vec2(const T &value_for_all)
+        : x(value_for_all), y(value_for_all)
+    {
     }
 
-    vec2(const T &_x, const T &_y) {
-        x = _x;
-        y = _y;
+    constexpr vec2(const T &x, const T &y)
+        : x(x), y(y)
+    {
     }
 
     template<typename T2>
-    vec2(const vec2<T2> &other) {
-        x = static_cast<T>(other.x);
-        y = static_cast<T>(other.y);
+    constexpr vec2(const vec2<T2> &other)
+        : x(other.x), y(other.y)
+    {
     }
 
-    static vec2 one() {
+    constexpr static vec2 one() {
         return { 1, 1 };
     }
 
-    static vec2 zero() {
+    constexpr static vec2 zero() {
         return { 0, 0 };
+    }
+
+    operator Vector2() const {
+        return {
+            static_cast<float>(x),    
+            static_cast<float>(y)
+        };    
     }
 
     bool operator==(const vec2 &other) const {
@@ -86,6 +94,18 @@ struct vec2 {
         };
     }
 
+    vec2 operator*(const vec2 &other) const {
+        return vec2{
+            x * other.x, y * other.y
+        };
+    }
+
+    vec2 operator/(const vec2 &other) const {
+        return vec2{
+            x / other.x, y / other.y
+        };
+    }
+
     vec2 operator*(const T &other) const {
         return vec2{
             x * other, y * other
@@ -106,6 +126,26 @@ struct vec2 {
     void operator-=(const vec2 &other) {
         x -= other.x;
         y -= other.y;
+    }
+
+    void operator+=(const T &other) {
+        x += other;
+        y += other;
+    }
+
+    void operator-=(const T &other) {
+        x -= other;
+        y -= other;
+    }
+
+    void operator*=(const vec2 &other) {
+        x *= other.x;
+        y *= other.y;
+    }
+
+    void operator/=(const vec2 &other) {
+        x /= other.x;
+        y /= other.y;
     }
 
     void operator*=(const T &other) {
@@ -144,34 +184,47 @@ template<typename T>
 struct vec3 {
     T x, y, z;
 
-    vec3() {
-        x = y = z = 0;
+    
+    constexpr vec3() 
+        : x(0), y(0), z(0) 
+    {
     }
 
-    vec3(const T &value_for_all) {
-        x = value_for_all;
-        y = value_for_all;
-        z = value_for_all;
+    constexpr vec3(const T &value_for_all)
+        : x(value_for_all), y(value_for_all), z(value_for_all)
+    {
     }
 
-    vec3(const T &_x, const T &_y, const T &_z) {
-        x = _x;
-        y = _y;
-        z = _z;
+    constexpr vec3(const T &x, const T &y, const T &z)
+        : x(x), y(y), z(z)
+    {
     }
 
-    vec3(const vec2<T> &other, const T &_z) {
-        x = other.x;
-        y = other.y;
-        z = _z;
+    template<typename T2>
+    constexpr vec3(const vec3<T2> &other)
+        : x(other.x), y(other.y), z(other.z)
+    {
     }
 
-    static vec3 one() {
+    constexpr vec3(const vec2<T> &other, const T &z)
+        : x(other.x), y(other.y), z(z)
+    {
+    }
+
+    constexpr static vec3 one() {
         return { 1, 1, 1 };
     }
 
-    static vec3 zero() {
+    constexpr static vec3 zero() {
         return { 0, 0, 0 };
+    }
+
+    operator Vector3() const {
+        return {
+            static_cast<float>(x),    
+            static_cast<float>(y),
+            static_cast<float>(z)
+        };    
     }
 
     bool operator==(const vec3 &other) const {
@@ -267,37 +320,41 @@ template<typename T>
 struct vec4 {
     T x, y, z, w;
 
-    vec4() {
-        x = y = z = w = 0;
+    constexpr vec4() 
+        : x(0), y(0), z(0), w(0)
+    {
     }
 
-    vec4(const T &value_for_all) {
-        x = value_for_all;
-        y = value_for_all;
-        z = value_for_all;
-        w = value_for_all;
+    constexpr vec4(const T &value_for_all) 
+        : x(value_for_all), y(value_for_all), z(value_for_all), w(value_for_all)
+    {
     }
 
-    vec4(const T &_x, const T &_y, const T &_z, const T &_w) {
-        x = _x;
-        y = _y;
-        z = _z;
-        w = _w;
+    constexpr vec4(const T &x, const T &y, const T &z, const T &w) 
+        : x(x), y(y), z(z), w(w)
+    {
     }
 
-    vec4(const vec2<T> &v1, const vec2<T> &v2) {
-        x = v1.x;
-        y = v1.y;
-        z = v2.x;
-        w = v2.y;
+    constexpr vec4(const vec2<T> &v1, const vec2<T> &v2)
+        : x(v1.x), y(v1.y), z(v2.x), w(v2.y)
+    {
     }
 
-    static vec4 one() {
+    constexpr static vec4 one() {
         return { 1, 1, 1, 1 };
     }
 
-    static vec4 zero() {
+    constexpr static vec4 zero() {
         return { 0, 0, 0, 0 };
+    }
+
+    operator Vector4() const {
+        return {
+            static_cast<float>(x),    
+            static_cast<float>(y),
+            static_cast<float>(z),
+            static_cast<float>(w)
+        };    
     }
 
     bool operator==(const vec4 &other) const {
@@ -418,6 +475,7 @@ vec3<T> cross(const vec3<T> &v1, const vec3<T> &v2) {
     };
 }
 
+typedef vec2<i8>  vec2b;
 typedef vec2<u32> vec2u;
 typedef vec2<i32> vec2i;
 typedef vec2<f32> vec2f;
@@ -432,5 +490,3 @@ typedef vec4<u32> vec4u;
 typedef vec4<i32> vec4i;
 typedef vec4<f32> vec4f;
 typedef vec4<f64> vec4d;
-
-#endif // VEC_HPP

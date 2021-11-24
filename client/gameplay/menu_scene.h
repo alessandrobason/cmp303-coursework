@@ -1,23 +1,26 @@
 #pragma once
 
 #include <core/scene.h>
+#include <core/sprite.h>
 #include <utils/rect.h>
 
 class MenuScene : public Scene {
     enum class State {
-        main, join, host, options
+        main, join, play
     };
 
 public:
     ~MenuScene() override;
     void onInit() override;
+    void onExit() override;
     void onRender() override;
 
 private:
     void mainMenu(); 
+    void playMenu();
     void joinMenu();
-    void hostMenu();
-    void optionsMenu();
+
+    void drawBackground();
 
     void nextHor();
     void nextVer();
@@ -30,4 +33,9 @@ private:
     rectf current;
     f32 spacing;
     f32 padding;
+
+    Sprite bomb;
+    Sprite bg;
+
+    char ip_buf[80];
 };

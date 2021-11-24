@@ -11,15 +11,14 @@ class Powerup : public GameObject {
 public:
     using GameObject::GameObject;
 
-    Powerup(vec2i position);
-    ~Powerup();
-    void onInit() override;
-    void onUpdate() override;
-    void onRender(bool is_debug) override;
+    constexpr static u32 id() { return 5; }
 
+    void onInit() override;
+
+    inline void setType(int newtype) { type = newtype; }
     inline int getType() { return type; }
+    u32 getTypeId() const override { return Powerup::id(); };
 
 private:
-    StaticBody collider;
     int type = 0;
 };

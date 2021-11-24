@@ -12,6 +12,7 @@ add_executable(client
     gameplay/objects/crate.cc
     gameplay/objects/powerup.cc
     utils/unique_id.cc
+    utils/base26.cc
     core/assets.cc
     core/json.cc
     core/sprite.cc
@@ -19,6 +20,8 @@ add_executable(client
     core/gui.cc
     core/scene.cc
     core/id.cc
+    net/net.cc
+    net/convert.cc
 )
 
 target_link_libraries(client raylib)

@@ -1,13 +1,11 @@
 #pragma once
 
 #include <string>
-
 #include <raylib.h>
 #include <utils/types.h>
 #include <utils/dynarray.h>
 #include <utils/vec.h>
 #include <utils/rect.h>
-
 #include <gameplay/collider.h>
 
 struct TileAnimation {
@@ -31,9 +29,7 @@ struct Tilemap {
     i32 layers_under = 0;
     dynarray<i32> tiles;
     dynarray<TileAnimation> animations;
-    StaticBody colliders;
-    // dynarray<RectCollider> rect_colliders;
-    // dynarray<CircleCollider> circ_colliders;
+    // StaticBody colliders;
 
     ~Tilemap();
     void onExit();
@@ -44,8 +40,6 @@ struct Tilemap {
 
     recti getBounds() const;
     i32 positionToIndex(const vec2i &position) const;
-    // bool isColliding(const RectCollider &rect) const;
-    // bool isColliding(const CircleCollider &circ) const;
 
     void update();
 

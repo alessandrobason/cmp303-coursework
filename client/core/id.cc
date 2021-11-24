@@ -1,3 +1,3 @@
 #include "id.h"
 
-u32 type_count = 0;
+// u32 type_count = 0;

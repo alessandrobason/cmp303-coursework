@@ -4,46 +4,43 @@
 #include <tracelog.h>
 #include <time.h>
 
+#include <utils/interpolation.h>
 #include <gameplay/objects/explosion.h>
+#include <gameplay/objects/powerup.h>
 
 MapScene gmap;
 
-bool sortFn(const ptr<GameObject> &a, const ptr<GameObject> &b) {
+bool sortFn(const GameObject *a, const GameObject *b) {
     return *a < *b;
 }
 
 MapScene::~MapScene() {
+    mtxDestroy(map_mutex);
 }
 
 void MapScene::onInit() {
-    srand(time(NULL));
-    int r = rand() % 3;
-    // r = 0;
-    map.loadFromJSON(TextFormat("res/tiled/map_%d.json", r));
-    // map.loadFromJSON("res/tiled/map_1.json");
-    int under = (map.layers_under - 1) * map.size.x * map.size.y;
-    obj_map.resize(map.size.x * map.size.y);
-    for(int y = 0; y < map.size.y; ++y) {
-        for(int x = 0; x < map.size.x; ++x) {
-            int i = x + y * map.size.x;
-            if(map.tiles[under + i] >= 0) {
-                obj_map[i].id = -1;
-            }
-        }
-    }
-    placeCrates();
+    map_mutex = mtxInit();
+
+    win.load("res/win.png");
+    lose.load("res/lose.png");
+
+    int res_w = Config::get().resolution.x;
+
+    win.position.x  = (res_w - win.size.x) / 2;
+    lose.position.x = (res_w - lose.size.x) / 2;
 }
 
 void MapScene::onEnter() {
-    objects.emplace_back(std::make_unique<Player>());
-
-    for(auto &obj : objects) {
+    assert(map_id != -1);
+    map.loadFromJSON(TextFormat("res/tiled/map_%d.json", map_id));
+    
+    for (auto &obj : objects) {
         obj->onInit();
     }
 }
 
 void MapScene::onExit() {
-    for(auto &obj : objects) {
+    for (auto &obj : objects) {
         obj->onExit();
     }
     objects.clear();
@@ -54,137 +51,115 @@ void MapScene::onDestroy() {
 }
 
 void MapScene::onUpdate() {
-    g_world.Step(1.f / 60.f, 6, 2);
-    handleCollisions();
-
-    if(IsKeyPressed(KEY_O)) {
-        draw_colliders = !draw_colliders;
-    }
-
     map.update();
-    for(auto &obj : objects) {
+    for (auto &obj : objects) {
+        if (obj->getTypeId() == Bomb::id()) {
+            int a = 0;
+        }
         obj->onUpdate();
     }
 
     actuallyRemove();
 
-    for(auto &add : to_add) {
-        add->onInit();
-        objects.emplace_back(add);
-    }
+    {
+        lock_t lock(map_mutex);
 
-    to_add.clear();
+        for (auto &add : to_add) {
+            add->onInit();
+            objects.emplace_back(add);
+        }
+
+        to_add.clear();
+    }
 
     std::sort(objects.begin(), objects.end(), sortFn);
 }
 
 void MapScene::onRender() {
     drawTilemapUnder(map);
-        if(draw_colliders) {
-            map.colliders.render(ORANGE);
-        }
-        for(auto &obj : objects) {
-            obj->onRender(draw_colliders);
-        }
+    for (auto &obj : objects) {
+        obj->onRender(draw_colliders);
+    }
     drawTilemapOver(map);
-}
 
-void MapScene::addExplosion(vec2i position, vec2i direction, int strength) {
-    clampToCell(position);
-    vec2i next_pos = position + (direction * Config::get().tile_size);
-    position = next_pos / Config::get().tile_size;
-    u32 index = position.x + position.y * map.size.x;
-    TypeId type = obj_map[index];
+    {
+        lock_t lock(map_mutex);
+        if(is_finished) {
+            static float t = 0.f;
 
-    if(type.id == 0) {
-        addObject<Explosion>(index, true, next_pos, direction, strength);
-    }
-    else if(type == getUniqueTypeId<Crate>()) {
-        for(auto &obj : objects) {
-            if(obj->getPosition() == next_pos) {
-                ((Crate *)obj.get())->onHit();
-                break;
+            if(has_won) {
+                win.position.y = lerp<easeOutElastic>(-20.f, 132.f, t);
+                drawSprite(win);
             }
+            else {
+                lose.position.y = lerp<easeOutElastic>(-20.f, 132.f, t);
+                drawSprite(lose);
+            }
+
+            t += GetFrameTime() * 0.2f;
         }
-        addObject<Explosion>(index, true, next_pos, direction, 0);
     }
 }
 
-void MapScene::removeCollider(StaticBody *ptr) {
-    body_to_remove.emplace_back(ptr);
+void MapScene::addObject(u8 id, vec2i pos, u8 type) {
+    lock_t lock(map_mutex);
+    switch (id) {
+    case Bomb::id():
+        to_add.emplace_back(new Bomb(pos));
+        break;
+    case Crate::id():
+        to_add.emplace_back(new Crate(pos));
+        break;
+    case Explosion::id():
+        to_add.emplace_back(new Explosion(pos));
+        break;
+    case Powerup::id(): {
+        Powerup *p = new Powerup(pos);
+        p->setType(type);
+        to_add.emplace_back(p);
+        break;
+    }
+    default: 
+        err("unknown id: %u", id);
+    }
 }
 
-void MapScene::handleCollisions() {
-    b2Contact *contact = g_world.GetContactList();
-	int contact_count = g_world.GetContactCount();
-
-    for(int i = 0; i < contact_count; ++i) {
-        if(contact->IsTouching()) {
-			b2Body *body_a = contact->GetFixtureA()->GetBody();
-			b2Body *body_b = contact->GetFixtureB()->GetBody();
-
-			((StaticBody *)body_a->GetUserData().pointer)->collision(body_b);
-			((StaticBody *)body_b->GetUserData().pointer)->collision(body_a);
+void MapScene::removeObject(u32 id, vec2i pos) {
+    lock_t lock(map_mutex);
+    for (size_t i = 0; i < objects.size(); ++i) {
+        auto &obj = objects[i];
+        if (!obj->isDead() &&
+             obj->getTypeId() == id &&
+             obj->getPosition() == pos) 
+        {
+            obj->setDead(true);
+            break;
         }
-
-		contact = contact->GetNext();
     }
 }
 
 void MapScene::actuallyRemove() {
-    size_t size = objects.size();
-    for(size_t i = 0; i < size; ++i) {
-        auto &obj = objects[i];
-        if(obj->isDead()) {
-            setId(positionToIndex(obj->getPosition()), 0);
-
-            obj->onExit();
-            i--;
-            size--;
-            obj.swap(objects[size]);
-        }
-    }
+    // -- Remove objects ---------------------------------
     
-    objects.resize(size);
-
-    for(auto &body : body_to_remove) {
-        body->cleanup();
-    }
-
-    body_to_remove.clear();
-}
-
-void MapScene::placeCrates() {
-    constexpr int ystart = 6;
-    constexpr int yend   = 15;
-    constexpr int xstart = 5;
-    constexpr int xend   = 20;
-
-    constexpr vec2i skip[] = {
-        {  5,  6 }, {  6,  6 }, {  5,  7 },
-        { 18,  6 }, { 19,  6 }, { 19,  7 },
-        {  5, 13 }, {  6, 14 }, {  5, 14 },
-        { 18, 14 }, { 19, 14 }, { 19, 13 },
-    };
-
-    for(int y = ystart; y < yend; ++y) {
-        for(int x = xstart; x < xend; ++x) {
-            vec2i v { x, y };
-            bool should_skip = false;
-            for(auto &s : skip) {
-                if(s == v) {
-                    should_skip = true;
-                    break;
+    {
+        lock_t lock(map_mutex);
+        i64 size = objects.size();
+        for (i64 i = 0; i < size; ++i) {
+            auto &obj = objects[i];
+            if (obj->isDead()) {
+                obj->onExit();
+                if (obj->getTypeId() != Player::id()) {
+                    delete obj;
                 }
-            }
-            if(should_skip) continue;
-            u32 index = x + y * map.size.x;
-            if(obj_map[index].id == 0) {
-                int r = rand() % 10;
-                if(r < 8) {
-                    addObject<Crate>(index, true, v * Config::get().tile_size);
-                }
+                objects[i] = objects[size - 1];
+                objects[size - 1] = nullptr;
+                //std::swap(objects[i], objects[size - 1]);
+                i--;
+                size--;
             }
         }
+
+        objects.resize(size);
     }
+
 }

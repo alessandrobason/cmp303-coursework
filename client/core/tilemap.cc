@@ -72,6 +72,7 @@ void Tilemap::loadFromJSON(const std::string &fname) {
             }
         }
 
+        /*
         // loading collisions
         {
             json::Array collisions = tilemap["collisions"];
@@ -100,6 +101,7 @@ void Tilemap::loadFromJSON(const std::string &fname) {
                 }
             }
         }
+        */
 
         // loading animations
         {

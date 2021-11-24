@@ -23,6 +23,12 @@ Sprite::~Sprite() {
     assets::destroyTexture(texture);
 }
 
+void Sprite::destroy() {
+    assets::destroyTexture(texture);
+    anim_positions.destroy();
+    animations.destroy();
+}
+
 Sprite &Sprite::operator=(Sprite &&spr) {
     if (this != &spr) {
         position = spr.position;
@@ -283,5 +289,5 @@ void drawSprite(const Sprite &spr) {
         dest.y -= dest.height;
     }
 
-    DrawTexturePro(spr.texture, source, dest, rl_origin, spr.rotation, WHITE);
+    DrawTexturePro(spr.texture, source, dest, rl_origin, spr.rotation, spr.color);
 }

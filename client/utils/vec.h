@@ -1,5 +1,4 @@
-#ifndef VEC_HPP
-#define VEC_HPP
+#pragma once
 
 #include <cmath>
 #include <raylib.h> // Vector2, Vector3, Vector4
@@ -476,6 +475,7 @@ vec3<T> cross(const vec3<T> &v1, const vec3<T> &v2) {
     };
 }
 
+typedef vec2<i8>  vec2b;
 typedef vec2<u32> vec2u;
 typedef vec2<i32> vec2i;
 typedef vec2<f32> vec2f;
@@ -490,5 +490,3 @@ typedef vec4<u32> vec4u;
 typedef vec4<i32> vec4i;
 typedef vec4<f32> vec4f;
 typedef vec4<f64> vec4d;
-
-#endif // VEC_HPP

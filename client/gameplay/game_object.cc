@@ -9,9 +9,12 @@ GameObject::GameObject() {
     unique_id = getUniqueId();
 }
 
+GameObject::GameObject(vec2i position) {
+    sprite.position = position;
+}
+
 GameObject::GameObject(GameObject &&other) {
     unique_id = other.unique_id;
-    type_id = other.type_id;
     sprite = std::move(other.sprite);
     other.unique_id = 0;
 }
@@ -27,7 +30,6 @@ void GameObject::onExit() {
 }
 
 void GameObject::onUpdate() {
-    assert(type_id.id != 0 && unique_id.id != 0 && "didn't initialize ids");
     sprite.update();
 }
 
@@ -35,7 +37,7 @@ void GameObject::onRender(bool is_debug) {
     drawSprite(sprite);
 }
 
-bool GameObject::operator<(const GameObject &other) {
+bool GameObject::operator<(const GameObject &other) const {
     return sprite.position.y < other.sprite.position.y;
 }
 

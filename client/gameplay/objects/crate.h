@@ -7,14 +7,8 @@ class Crate : public GameObject {
 public:
     using GameObject::GameObject;
 
-    Crate(vec2i position);
-    ~Crate();
+    constexpr static u32 id() { return 2; }
+
     void onInit() override;
-    void onUpdate() override;
-    void onRender(bool is_debug) override;
-
-    void onHit();
-
-private:
-    StaticBody collider;
+    inline u32 getTypeId() const override { return Crate::id(); };
 };

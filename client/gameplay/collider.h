@@ -3,7 +3,6 @@
 #include <vector>
 
 #include <box2d/box2d.h>
-#include <raylib.h>
 #include <utils/vec.h>
 
 extern b2World g_world;
@@ -27,16 +26,7 @@ typedef void (*CollisionResponseFunc)(b2Body *, void *);
 class StaticBody {
 public:
     StaticBody() = default;
-    StaticBody(const StaticBody &other) {
-        collision_response = other.collision_response;
-        collision_udata = other.collision_udata;
-        body = other.body;
-        // when a vector resizes it may change the "this"
-        // pointer, reset it just for good measure
-        if(body)
-            body->GetUserData().pointer = (uintptr_t)this;
-    }
-    ~StaticBody() = default;
+    StaticBody(const StaticBody &other);
 
     void init(const vec2i &position = vec2i::zero(), bool allow_sleep = true);
     void init(b2BodyDef &definition);
@@ -59,6 +49,8 @@ public:
     vec2i getPosition();
 
     void render(Color color);
+
+    u16 getMask();
 
     inline void setCollisionResponse(CollisionResponseFunc function);
     // gets called when a collision happens
